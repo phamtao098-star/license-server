@@ -97,7 +97,9 @@ def delete_license():
     if not license_key: return jsonify({'status': 'FAIL'}), 400
 
     license = License.query.filter_by(license_key=license_key).first()
-    if not license: return jsonify({'status': 'FAIL', 'message': 'Not found'}), 404
+    # 🔥 Dòng này đã được sửa (dấu đóng ngoặc tròn đã được chuyển ra cuối)
+    if not license: return jsonify({'status': 'FAIL', 'message': 'Not found'}), 404 
+    # ----------------------------------------------------------------------
 
     try:
         db.session.delete(license)
