@@ -76,8 +76,8 @@ def create_license():
     expiry_date_str = data.get('expiry_date')
     zalo_id = data.get('zalo_id')
 
-    if not license_key or not expiry_date_str: return jsonify({'status': 'FAIL'}), 400
-    if License.query.filter_by(license_key=license_key).first(): return jsonify({'status': 'FAIL', 'msg': 'Exists'}), 409
+    if not license_key or not expiry_date_str: return jsonify({'status': 'FAIL', 'message': 'Missing data'}), 400
+    if License.query.filter_by(license_key=license_key).first(): return jsonify({'status': 'FAIL', 'message': 'License already exists'}), 409
 
     try:
         expiry_date = datetime.datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
@@ -94,10 +94,10 @@ def delete_license():
     if data.get('admin_key') != ADMIN_SECRET: return jsonify({'status': 'FAIL'}), 401
 
     license_key = data.get('license_key')
-    if not license_key: return jsonify({'status': 'FAIL'}), 400
+    if not license_key: return jsonify({'status': 'FAIL', 'message': 'Missing license key'}), 400
 
     license = License.query.filter_by(license_key=license_key).first()
-    # 🔥 Dòng này đã được sửa (dấu đóng ngoặc tròn đã được chuyển ra cuối)
+    # 🔥 SỬA LỖI CÚ PHÁP TẠI ĐÂY (Thiếu 'message' và '}')
     if not license: return jsonify({'status': 'FAIL', 'message': 'Not found'}), 404 
     # ----------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ def delete_license():
         return jsonify({'status': 'DELETED', 'message': f'License {license_key} deleted.'}), 200
     except Exception as e: return jsonify({'status': 'ERROR', 'message': str(e)}), 500
 
-# 🔥 7. TẢI VỀ TOÀN BỘ LOG (Admin - Dùng cho Đồng bộ) 🔥
+# 7. TẢI VỀ TOÀN BỘ LOG (Admin - Dùng cho Đồng bộ)
 @app.route('/api/v1/admin/download', methods=['POST'])
 def admin_download_logs():
     data = request.json or {}
@@ -140,17 +140,17 @@ def activate_license():
     data = request.json or {}
     license_key = data.get('license_key')
     machine_id = data.get('machine_id')
-    if not license_key or not machine_id: return jsonify({'status': 'FAIL'}), 400
+    if not license_key or not machine_id: return jsonify({'status': 'FAIL', 'message': 'Missing key or machine ID'}), 400
 
     license = License.query.filter_by(license_key=license_key).first()
-    if not license: return jsonify({'status': 'FAIL', 'message': 'Not found'}), 404
-    if license.status != 'ACTIVE': return jsonify({'status': license.status}), 403
-    if license.allowed_machine_id and license.allowed_machine_id != machine_id: return jsonify({'status': 'FAIL', 'msg': 'Wrong Device'}), 403
+    if not license: return jsonify({'status': 'FAIL', 'message': 'License not found'}), 404
+    if license.status != 'ACTIVE': return jsonify({'status': license.status, 'message': 'License is not active'}), 403
+    if license.allowed_machine_id and license.allowed_machine_id != machine_id: return jsonify({'status': 'FAIL', 'message': 'Wrong Device'}), 403
     
     license.allowed_machine_id = machine_id
     license.last_check = datetime.datetime.utcnow()
     db.session.commit()
-    return jsonify({'status': 'ACTIVATED', 'expiry_date': license.expiry_date.strftime('%Y-%m-%d')}), 200
+    return jsonify({'status': 'ACTIVATED', 'expiry_date': license.expiry_date.strftime('%Y-%m-%d'), 'message': 'License activated successfully.'}), 200
 
 # 4. KIỂM TRA (Client)
 @app.route('/api/v1/validate', methods=['POST'])
@@ -158,19 +158,19 @@ def validate_license():
     data = request.json or {}
     license_key = data.get('license_key')
     machine_id = data.get('machine_id')
-    if not license_key or not machine_id: return jsonify({'status': 'FAIL'}), 400
+    if not license_key or not machine_id: return jsonify({'status': 'FAIL', 'message': 'Missing key or machine ID'}), 400
 
     license = License.query.filter_by(license_key=license_key).first()
-    if not license: return jsonify({'status': 'FAIL', 'message': 'Not found'}), 404
+    if not license: return jsonify({'status': 'FAIL', 'message': 'License not found'}), 404
     if license.expiry_date < datetime.date.today():
         license.status = 'EXPIRED'
         db.session.commit()
-        return jsonify({'status': 'EXPIRED'}), 403
-    if license.allowed_machine_id != machine_id: return jsonify({'status': 'FAIL'}), 403
+        return jsonify({'status': 'EXPIRED', 'message': 'License has expired.'}), 403
+    if license.allowed_machine_id != machine_id: return jsonify({'status': 'FAIL', 'message': 'Wrong device ID.'}), 403
 
     license.last_check = datetime.datetime.utcnow()
     db.session.commit()
-    return jsonify({'status': 'OK', 'expiry_date': license.expiry_date.strftime('%Y-%m-%d')}), 200
+    return jsonify({'status': 'OK', 'expiry_date': license.expiry_date.strftime('%Y-%m-%d'), 'message': 'License is valid.'}), 200
 
 # 5. GIA HẠN (Admin)
 @app.route('/api/v1/extend', methods=['POST'])
@@ -179,13 +179,13 @@ def extend_license():
     if data.get('admin_key') != ADMIN_SECRET: return jsonify({'status': 'FAIL'}), 401
     
     license = License.query.filter_by(license_key=data.get('license_key')).first()
-    if not license: return jsonify({'status': 'FAIL'}), 404
+    if not license: return jsonify({'status': 'FAIL', 'message': 'License not found'}), 404
     
     base_date = license.expiry_date if license.expiry_date >= datetime.date.today() else datetime.date.today()
     license.expiry_date = base_date + datetime.timedelta(days=data.get('days_to_add', 0))
     license.status = 'ACTIVE'
     db.session.commit()
-    return jsonify({'status': 'EXTENDED', 'new_expiry_date': license.expiry_date.strftime('%Y-%m-%d')}), 200
+    return jsonify({'status': 'EXTENDED', 'new_expiry_date': license.expiry_date.strftime('%Y-%m-%d'), 'message': 'License extended successfully.'}), 200
 
 # 6. ĐỔI MÁY (Admin)
 @app.route('/api/v1/relicense', methods=['POST'])
@@ -194,12 +194,14 @@ def relicense_key():
     if data.get('admin_key') != ADMIN_SECRET: return jsonify({'status': 'FAIL'}), 401
     
     license = License.query.filter_by(license_key=data.get('license_key')).first()
-    if not license: return jsonify({'status': 'FAIL'), 404
+    # 🔥 SỬA LỖI CÚ PHÁP TẠI ĐÂY (Thiếu ngoặc nhọn và message)
+    if not license: return jsonify({'status': 'FAIL', 'message': 'License not found'}), 404
+    # ----------------------------------------------------------------------
 
     license.allowed_machine_id = data.get('new_machine_id')
     license.status = 'ACTIVE'
     db.session.commit()
-    return jsonify({'status': 'RE-LICENSED', 'new_machine_id': license.allowed_machine_id}), 200
+    return jsonify({'status': 'RE-LICENSED', 'new_machine_id': license.allowed_machine_id, 'message': 'Device ID updated.'}), 200
 
 if __name__ == '__main__':
     print("🚀 Running Local Mode...")
