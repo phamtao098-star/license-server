@@ -133,7 +133,36 @@ def admin_download_logs():
         
     except Exception as e: return jsonify({'status': 'ERROR', 'message': str(e)}), 500
 # ----------------------------------------------------------------------------------
+@app.route('/api/v1/admin/edit_zalo', methods=['POST'])
+def edit_zalo_id():
+    data = request.json or {}
+    # 1. Xác thực Admin
+    if data.get('admin_key') != ADMIN_SECRET: 
+        return jsonify({'status': 'FAIL', 'message': 'Admin authentication failed.'}), 401
 
+    license_key = data.get('license_key')
+    new_zalo_id = data.get('new_zalo_id')
+    
+    if not license_key or new_zalo_id is None: # new_zalo_id có thể là chuỗi rỗng
+        return jsonify({'status': 'FAIL', 'message': 'Missing license key or new Zalo ID.'}), 400
+
+    license = License.query.filter_by(license_key=license_key).first()
+    if not license: 
+        return jsonify({'status': 'FAIL', 'message': 'License not found.'}), 404
+    
+    try:
+        # 2. Cập nhật trường zalo_id
+        license.zalo_id = new_zalo_id
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'UPDATED', 
+            'message': f'Zalo ID for {license_key} updated successfully.',
+            'new_zalo_id': new_zalo_id
+        }), 200
+    except Exception as e: 
+        return jsonify({'status': 'ERROR', 'message': str(e)}), 500
+# ----------------------------------------------------------------------------------
 # 3. KÍCH HOẠT (Client)
 @app.route('/api/v1/activate', methods=['POST'])
 def activate_license():
