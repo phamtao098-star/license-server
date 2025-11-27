@@ -56,6 +56,16 @@ def handle_error(error):
     if hasattr(error, 'code'): code = error.code
     return jsonify({"status": "ERROR", "message": str(error), "code": code}), code
 
+# 🔥 THÊM ENDPOINT KEEP-ALIVE/PING MỚI 🔥
+@app.route('/api/v1/ping', methods=['GET', 'POST'])
+def ping():
+    """Endpoint đơn giản để Client giữ server không bị ngủ."""
+    return jsonify({
+        "status": "PONG", 
+        "message": "Server is awake",
+        "time": datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    }), 200
+
 # --- API ENDPOINTS ---
 
 @app.route('/', methods=['GET'])
